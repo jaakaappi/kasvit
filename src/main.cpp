@@ -17,9 +17,12 @@ bool ota_disabled = false;
 
 void setup()
 {
+  delay(1000);
+
   pinMode(ota_pin, INPUT);
 
   Serial.begin(9600);
+  Serial.println(esp_sleep_get_wakeup_cause());
 
   WiFi.begin(SSID, PWD);
   Serial.println("Wifi connecting");
@@ -90,7 +93,21 @@ void setup()
     Serial.println("OTA enabled");
   }
 
-  Serial.println("== Ready to serve! ==");
+  if (ota_disabled)
+  {
+    struct tm next_time = timeinfo;
+    next_time.tm_mday = timeinfo.tm_mday == 31 ? 1 : next_time.tm_mday + 1;
+    next_time.tm_hour = 13 - 2; // too lazy to set timezone
+    next_time.tm_min = 0;
+    next_time.tm_sec = 0;
+
+    double sleep_duration_seconds = (double)difftime(mktime(&next_time), mktime(&timeinfo));
+    Serial.println(&next_time, "%A, %B %d %Y %H:%M:%S");
+    Serial.println(sleep_duration_seconds);
+
+    delay(1000);
+    esp_deep_sleep(sleep_duration_seconds * 1000000);
+  }
 }
 
 void loop()
@@ -98,20 +115,5 @@ void loop()
   if (!ota_disabled)
   {
     ArduinoOTA.handle();
-  }
-  else
-  {
-    struct tm next_time = timeinfo;
-    next_time.tm_mday = timeinfo.tm_mday == 31 ? 1 : next_time.tm_mday + 1;
-    next_time.tm_hour = 15; // too lazy to set timezone
-    next_time.tm_min = 0;
-    next_time.tm_sec = 0;
-
-    int sleep_duration_seconds = (int)difftime(mktime(&next_time), mktime(&timeinfo));
-    Serial.println(&next_time, "%A, %B %d %Y %H:%M:%S");
-    Serial.println(sleep_duration_seconds);
-
-    esp_sleep_enable_timer_wakeup(sleep_duration_seconds * 1000000);
-    esp_deep_sleep_start();
   }
 }
