@@ -1,0 +1,22 @@
+{
+  "name": "plant-snoop-back",
+  "version": "1.0.0",
+  "description": "REST API and database for the plant-snoop system",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaakaappi/plant-snoop-back.git"
+  },
+  "author": "Esa Niemi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jaakaappi/plant-snoop-back/issues"
+  },
+  "homepage": "https://github.com/jaakaappi/plant-snoop-back#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
