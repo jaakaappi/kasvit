@@ -3,9 +3,7 @@ const app = express();
 const port = 3000;
 
 app.post("/images", (req, res) => {
-  res.send({
-    update: true,
-  });
+  res.sendStatus(200);
 });
 
 app.listen(port, () => {});
