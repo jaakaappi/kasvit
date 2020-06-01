@@ -5,7 +5,6 @@
 #include <ArduinoOTA.h>
 #include <time.h>
 #include <HTTPClient.h>
-#include "Arduino_JSON.h"
 #include "esp_camera.h"
 #include "soc/soc.h"          // Disable brownout problems
 #include "soc/rtc_cntl_reg.h" // Disable brownout problems
@@ -246,14 +245,14 @@ void setup()
     HTTPClient http;
     String serverPath = String(API_URL) + "/images";
 
-    http.begin(serverPath.c_str());
-    http.addHeader("Content-Type", "application/json");
-    // TODO make this monstrosity prettier
-    JSONVar requestObject;
     char isoTimeString[200];
     strftime(isoTimeString, sizeof(isoTimeString), "%FT%T+03:00", &timeinfo);
-    requestObject["datetime"] = String(isoTimeString);
-    int httpResponseCode = http.POST(JSON.stringify(requestObject));
+
+    http.begin(serverPath.c_str());
+    http.addHeader("Content-Type", "application/octet-stream");
+    http.addHeader("Picture-FileName", String(isoTimeString) + ".jpeg");
+    File picture = SPIFFS.open(FILE_PHOTO);
+    int httpResponseCode = http.sendRequest("POST", &picture, picture.size());
 
     if (httpResponseCode > 0)
     {
