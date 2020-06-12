@@ -58,6 +58,7 @@ void setup()
 
   // === CONNECT WIFI ===
 
+  WiFi.mode(WIFI_MODE_STA);
   WiFi.begin(SSID, PWD);
   Serial.println("Wifi connecting");
 
@@ -278,8 +279,10 @@ void setup()
     next_time.tm_min = timeinfo.tm_min + 2; // dev shortcut
 
     double sleep_duration_seconds = (double)difftime(mktime(&next_time), mktime(&timeinfo));
-    Serial.println(&next_time, "%A, %B %d %Y %H:%M:%S");
-    Serial.println(sleep_duration_seconds);
+    Serial.println(&next_time, "Next wake-up %A, %B %d %Y %H:%M:%S");
+
+    WiFi.mode(WIFI_OFF);
+    btStop();
 
     delay(1000);
     esp_deep_sleep(sleep_duration_seconds * 1000000);
