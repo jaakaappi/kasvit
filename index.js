@@ -1,8 +1,11 @@
+const basicAuth = require("express-basic-auth");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const dotenv = require("dotenv");
 const express = require("express");
 const fs = require("fs");
 
+dotenv.config();
 const app = express();
 const port = 3001;
 
@@ -10,10 +13,16 @@ app.use(cors());
 app.use(bodyParser.raw({ limit: "500kb" }));
 app.use(express.static("public"));
 
-app.post("/api/images", (req, res) => {
+const user = process.env.API_USER;
+const pwd = process.env.API_USER_PWD;
+
+console.log(user, pwd);
+
+app.post("/api/images", basicAuth({ users: { [user]: pwd } }), (req, res) => {
   const timestamp = req.get("Picture-FileName");
-  if (!fs.exists("/images", () => {})) fs.mkdir("./images", () => {});
-  fs.writeFile(`./images/${timestamp}.jpg`, req.body, (err) => {
+  if (!fs.exists("./public/images", () => {}))
+    fs.mkdir("./public/images", () => {});
+  fs.writeFile(`./public/images/${timestamp}.jpg`, req.body, (err) => {
     if (err) return console.log(err);
   });
   res.sendStatus(200);
