@@ -10,7 +10,7 @@ const app = express();
 const port = 3001;
 
 app.use(cors());
-app.use(bodyParser.raw({ limit: "500kb" }));
+app.use(bodyParser.raw({ limit: "50mb" }));
 app.use(express.static("public"));
 
 const user = process.env.API_USER;
