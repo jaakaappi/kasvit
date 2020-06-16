@@ -5,7 +5,7 @@ function App() {
   const [imagesNames, setImageNames] = useState([]);
   useEffect(() => {
     axios
-      .get("http://localhost:3001/api/images")
+      .get(`${process.env.REACT_APP_API_URL}/api/images`)
       .then((response) => {
         setImageNames(response.data.ids);
       })
@@ -19,7 +19,10 @@ function App() {
         return (
           <div key={image}>
             <p>{image}</p>
-            <img src={`http://localhost:3001/images/${image}`} alt={image} />
+            <img
+              src={`${process.env.REACT_APP_API_URL}/images/${image}`}
+              alt={image}
+            />
           </div>
         );
       })}
