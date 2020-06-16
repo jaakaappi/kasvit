@@ -20,6 +20,7 @@ function App() {
           <div key={image}>
             <p>{image}</p>
             <img
+              style={{ width: "720px" }}
               src={`${process.env.REACT_APP_API_URL}/images/${image}`}
               alt={image}
             />
