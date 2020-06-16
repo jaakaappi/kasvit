@@ -20,8 +20,14 @@ console.log(user, pwd);
 
 app.post("/api/images", basicAuth({ users: { [user]: pwd } }), (req, res) => {
   const timestamp = req.get("Picture-FileName");
-  if (!fs.exists("./public/images", () => {}))
-    fs.mkdir("./public/images", () => {});
+  if (
+    !fs.exists("./public/images", (err) => {
+      if (err) return console.log(err);
+    })
+  )
+    fs.mkdir("./public/images", (err) => {
+      if (err) return console.log(err);
+    });
   fs.writeFile(`./public/images/${timestamp}.jpg`, req.body, (err) => {
     if (err) return console.log(err);
   });
@@ -29,8 +35,14 @@ app.post("/api/images", basicAuth({ users: { [user]: pwd } }), (req, res) => {
 });
 
 app.get("/api/images", (req, res) => {
-  if (!fs.exists("./public/images", () => {}))
-    fs.mkdir("./public/images", () => {});
+  if (
+    !fs.exists("./public/images", (err) => {
+      if (err) return console.log(err);
+    })
+  )
+    fs.mkdir("./public/images", (err) => {
+      if (err) return console.log(err);
+    });
   const files = fs.readdirSync("./public/images");
   res.send({ ids: files });
 });
