@@ -251,7 +251,7 @@ void setup()
 
     http.begin(serverPath.c_str());
     http.addHeader("Content-Type", "application/octet-stream");
-    http.addHeader("Picture-FileName", String(isoTimeString) + ".jpeg");
+    http.addHeader("Picture-FileName", "esp32 " + String(isoTimeString) + ".jpeg");
     File picture = SPIFFS.open(FILE_PHOTO);
     int httpResponseCode = http.sendRequest("POST", &picture, picture.size());
 
