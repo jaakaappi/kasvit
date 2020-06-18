@@ -1,40 +1,15 @@
 #include <Arduino.h>
+#include <FS.h>
 #include "WiFi.h"
 #include <ESPmDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <time.h>
 #include <HTTPClient.h>
-#include "esp_camera.h"
-#include "soc/soc.h"          // Disable brownout problems
-#include "soc/rtc_cntl_reg.h" // Disable brownout problems
-#include <SPIFFS.h>
-#include <FS.h>
-#include "img_converters.h"
 #include "driver/rtc_io.h"
 
-#include <config.h>
-
-// Photo File Name to save in SPIFFS
-#define FILE_PHOTO "/photo.jpg"
-
-// OV2640 camera module pins (CAMERA_MODEL_AI_THINKER)
-#define PWDN_GPIO_NUM 32
-#define RESET_GPIO_NUM -1
-#define XCLK_GPIO_NUM 0
-#define SIOD_GPIO_NUM 26
-#define SIOC_GPIO_NUM 27
-#define Y9_GPIO_NUM 35
-#define Y8_GPIO_NUM 34
-#define Y7_GPIO_NUM 39
-#define Y6_GPIO_NUM 36
-#define Y5_GPIO_NUM 21
-#define Y4_GPIO_NUM 19
-#define Y3_GPIO_NUM 18
-#define Y2_GPIO_NUM 5
-#define VSYNC_GPIO_NUM 25
-#define HREF_GPIO_NUM 23
-#define PCLK_GPIO_NUM 22
+#include "config.h"
+#include "plant_camera.h"
 
 const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = 0;
@@ -135,157 +110,55 @@ void setup()
 
   if (ota_disabled)
   {
-    // === MOUNT FILESYSTEM, TAKE PICTURE ===
-
-    // https://randomnerdtutorials.com/esp32-cam-take-photo-display-web-server/
-
-    if (!SPIFFS.begin(true))
+    File picture = take_image(FILE_PHOTO);
+    if (picture)
     {
-      Serial.println("An Error has occurred while mounting SPIFFS");
-      ESP.restart();
-    }
-    else
-    {
-      delay(500);
-      Serial.println("SPIFFS mounted successfully");
-    }
+      // === SEND PICTURE OVER HTTP ===
 
-    // Turn-off the 'brownout detector'
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+      //randomnerdtutorials.com/esp32-http-get-post-arduino/#http-post
+      HTTPClient http;
+      String serverPath = String(API_URL) + "/images";
 
-    // OV2640 camera module
-    camera_config_t config;
-    config.ledc_channel = LEDC_CHANNEL_0;
-    config.ledc_timer = LEDC_TIMER_0;
-    config.pin_d0 = Y2_GPIO_NUM;
-    config.pin_d1 = Y3_GPIO_NUM;
-    config.pin_d2 = Y4_GPIO_NUM;
-    config.pin_d3 = Y5_GPIO_NUM;
-    config.pin_d4 = Y6_GPIO_NUM;
-    config.pin_d5 = Y7_GPIO_NUM;
-    config.pin_d6 = Y8_GPIO_NUM;
-    config.pin_d7 = Y9_GPIO_NUM;
-    config.pin_xclk = XCLK_GPIO_NUM;
-    config.pin_pclk = PCLK_GPIO_NUM;
-    config.pin_vsync = VSYNC_GPIO_NUM;
-    config.pin_href = HREF_GPIO_NUM;
-    config.pin_sscb_sda = SIOD_GPIO_NUM;
-    config.pin_sscb_scl = SIOC_GPIO_NUM;
-    config.pin_pwdn = PWDN_GPIO_NUM;
-    config.pin_reset = RESET_GPIO_NUM;
-    config.xclk_freq_hz = 20000000;
-    config.pixel_format = PIXFORMAT_JPEG;
+      char isoTimeString[200];
+      strftime(isoTimeString, sizeof(isoTimeString), "%FT%T+03:00", &timeinfo);
 
-    if (psramFound())
-    {
-      config.frame_size = FRAMESIZE_UXGA;
-      config.jpeg_quality = 10;
-      config.fb_count = 2;
-    }
-    else
-    {
-      config.frame_size = FRAMESIZE_SVGA;
-      config.jpeg_quality = 12;
-      config.fb_count = 1;
-    }
+      http.begin(serverPath.c_str());
+      http.addHeader("Content-Type", "application/octet-stream");
+      http.addHeader("Picture-FileName", "esp32 " + String(isoTimeString) + ".jpeg");
+      int httpResponseCode = http.sendRequest("POST", &picture, picture.size());
 
-    // Camera init
-    esp_err_t err = esp_camera_init(&config);
-    if (err != ESP_OK)
-    {
-      Serial.printf("Camera init failed with error 0x%x", err);
-      ESP.restart();
-    }
-
-    camera_fb_t *fb = NULL; // pointer
-    bool ok = 0;            // Boolean indicating if the picture has been taken correctly
-
-    do
-    {
-      // Take a photo with the camera
-      Serial.println("Taking a photo...");
-
-      fb = esp_camera_fb_get();
-      if (!fb)
+      if (httpResponseCode > 0)
       {
-        Serial.println("Camera capture failed");
-        return;
-      }
-
-      // Photo file name
-      Serial.printf("Picture file name: %s\n", FILE_PHOTO);
-      File file = SPIFFS.open(FILE_PHOTO, FILE_WRITE);
-
-      // Insert the data in the photo file
-      if (!file)
-      {
-        Serial.println("Failed to open file in writing mode");
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        String payload = http.getString();
+        Serial.println(payload);
       }
       else
       {
-        file.write(fb->buf, fb->len); // payload (image), payload length
-        Serial.print("The picture has been saved in ");
-        Serial.print(FILE_PHOTO);
-        Serial.print(" - Size: ");
-        Serial.print(file.size());
-        Serial.println(" bytes");
+        Serial.print("Error code: ");
+        Serial.println(httpResponseCode);
       }
-      // Close the file
-      file.close();
-      esp_camera_fb_return(fb);
+      http.end();
 
-      // check if file has been correctly saved in SPIFFS
-      File f_pic = SPIFFS.open(FILE_PHOTO);
-      unsigned int pic_sz = f_pic.size();
-      ok = pic_sz > 100;
-    } while (!ok);
+      // === GO SLEEP ===
 
-    // === SEND PICTURE OVER HTTP ===
+      struct tm next_time = timeinfo;
+      // next_time.tm_mday = timeinfo.tm_mday == 31 ? 1 : next_time.tm_mday + 1;
+      // next_time.tm_hour = 13 - 2; // too lazy to set timezone
+      // next_time.tm_min = 0;
+      // next_time.tm_sec = 0;
+      next_time.tm_min = timeinfo.tm_min + 2; // dev shortcut
 
-    //randomnerdtutorials.com/esp32-http-get-post-arduino/#http-post
-    HTTPClient http;
-    String serverPath = String(API_URL) + "/images";
+      double sleep_duration_seconds = (double)difftime(mktime(&next_time), mktime(&timeinfo));
+      Serial.println(&next_time, "Next wake-up %A, %B %d %Y %H:%M:%S");
 
-    char isoTimeString[200];
-    strftime(isoTimeString, sizeof(isoTimeString), "%FT%T+03:00", &timeinfo);
+      WiFi.mode(WIFI_OFF);
+      btStop();
 
-    http.begin(serverPath.c_str());
-    http.addHeader("Content-Type", "application/octet-stream");
-    http.addHeader("Picture-FileName", "esp32 " + String(isoTimeString) + ".jpeg");
-    File picture = SPIFFS.open(FILE_PHOTO);
-    int httpResponseCode = http.sendRequest("POST", &picture, picture.size());
-
-    if (httpResponseCode > 0)
-    {
-      Serial.print("HTTP Response code: ");
-      Serial.println(httpResponseCode);
-      String payload = http.getString();
-      Serial.println(payload);
+      delay(1000);
+      esp_deep_sleep(sleep_duration_seconds * 1000000);
     }
-    else
-    {
-      Serial.print("Error code: ");
-      Serial.println(httpResponseCode);
-    }
-    http.end();
-
-    // === GO SLEEP ===
-
-    struct tm next_time = timeinfo;
-    // next_time.tm_mday = timeinfo.tm_mday == 31 ? 1 : next_time.tm_mday + 1;
-    // next_time.tm_hour = 13 - 2; // too lazy to set timezone
-    // next_time.tm_min = 0;
-    // next_time.tm_sec = 0;
-    next_time.tm_min = timeinfo.tm_min + 2; // dev shortcut
-
-    double sleep_duration_seconds = (double)difftime(mktime(&next_time), mktime(&timeinfo));
-    Serial.println(&next_time, "Next wake-up %A, %B %d %Y %H:%M:%S");
-
-    WiFi.mode(WIFI_OFF);
-    btStop();
-
-    delay(1000);
-    esp_deep_sleep(sleep_duration_seconds * 1000000);
   }
 }
 
