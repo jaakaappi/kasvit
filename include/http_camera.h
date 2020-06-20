@@ -1,11 +1,11 @@
 
 #include "esp_camera.h"
+#include <HTTPClient.h>
 #include "soc/soc.h"          // Disable brownout problems
 #include "soc/rtc_cntl_reg.h" // Disable brownout problems
-#include <SPIFFS.h>
-#include <FS.h>
-#include "img_converters.h"
 
+namespace http_camera
+{
 // OV2640 camera module pins (CAMERA_MODEL_AI_THINKER)
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
@@ -24,4 +24,5 @@
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
 
-File take_image(String filename);
+    void take_and_send_image();
+} // namespace http_camera
