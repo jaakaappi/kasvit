@@ -1,5 +1,6 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
+import "./App.css";
 
 function App() {
   const [imagesNames, setImageNames] = useState([]);
@@ -22,7 +23,7 @@ function App() {
       });
   }, []);
   return (
-    <div>
+    <div className="ImageList">
       {imagesNames.map((imageObject) => {
         return (
           <div key={imageObject.filename}>
@@ -30,7 +31,6 @@ function App() {
               "en-GB"
             )}`}</p>
             <img
-              style={{ width: "720px" }}
               src={`${process.env.REACT_APP_API_URL}/images/${imageObject.filename}`}
               alt={imageObject.filename}
             />
