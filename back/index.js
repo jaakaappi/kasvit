@@ -4,6 +4,7 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const express = require("express");
 const fs = require("fs");
+const sharp = require("sharp");
 
 dotenv.config();
 const app = express();
@@ -20,25 +21,54 @@ console.log(user, pwd);
 
 app.post("/api/images", basicAuth({ users: { [user]: pwd } }), (req, res) => {
   const sender = req.get("Picture-FileName");
+
   if (!fs.existsSync("./public/images"))
     fs.mkdir("./public/images", (err) => {
       console.error(err);
     });
-  //console.log(req);
+  if (!fs.existsSync("./public/images/previews"))
+    fs.mkdir("./public/images/previews", (err) => {
+      console.error(err);
+    });
+
+  const timestamp = Date.now();
+
   fs.writeFile(
-    `./public/images/${sender} ${Date.now()}.jpg`,
+    `./public/images/${sender} ${timestamp}.jpg`,
     req.body,
     (err) => {
       if (err) return console.log(err);
     }
   );
+
+  sharp(req.body)
+    .resize({ width: 720 })
+    .flop()
+    .flip()
+    .toFile(`./public/images/previews/${sender} ${timestamp}.jpg`)
+    .then((info) => {
+      console.log(info);
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+
   res.sendStatus(200);
 });
 
 app.get("/api/images", (req, res) => {
   if (!fs.existsSync("./public/images")) res.send({ ids: [] });
   else {
-    const files = fs.readdirSync("./public/images");
+    let files = fs.readdirSync("./public/images");
+    files = files.filter((file) => {
+      try {
+        const dirEntry = fs.statSync(`./public/images/${file}`);
+        return dirEntry.isFile();
+      } catch (error) {
+        console.log("Failed to check if file: " + error);
+        return false;
+      }
+    });
     res.send({
       ids: files
         .sort((first, second) => {
